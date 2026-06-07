@@ -19,10 +19,10 @@ from django.urls import path, include, reverse_lazy
 from rest_framework.authtoken import views
 
 urlpatterns = [
-    path('', include('backend.urls')),
     path('auth/', include('django.contrib.auth.urls')),
     path('auth/', include('djoser.urls')),
     path('auth/', include('djoser.urls.jwt')),
     path('api/', include('api.urls')),
     path('admin/', admin.site.urls),
+    path('', include('backend.urls')),
 ]

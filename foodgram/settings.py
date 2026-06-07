@@ -16,7 +16,7 @@ SECRET_KEY = 'django-insecure-+q)k1jb(f!%$x=mal_%$j&lx(e0w6di_-x$di*u(2btw^k0ez3
 
 DEBUG = True
 AUTH_USER_MODEL = 'backend.CustomUser'
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ["*"]
 
 
 
@@ -30,6 +30,7 @@ INSTALLED_APPS = [
     'backend.apps.BackendConfig',
     'rest_framework',
     'djoser',
+    'api.apps.ApiConfig',
 ]
 
 MIDDLEWARE = [
