@@ -1,0 +1,22 @@
+-------------------------- nginx снизу
+server {
+    listen 80;
+    server_name foobgram.sytes.net 81.26.183.15;
+    root /var/www/foodgram;
+    index index.html;
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+}
+--------------------------- gunicorn снизу
+[Unit]
+Description=gunicorn-foodgram daemon
+After=network.target
+[Service]
+User=ubuntu
+WorkingDirectory=/home/ubuntu/foodgram/backend/
+ExecStart=/home/ubuntu/foodgram/venv/bin/gunicorn --bind 0.0.0.0:8000 foodgram.wsgi:application
+[Install]
+
+WantedBy=multi-user.target
