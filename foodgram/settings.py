@@ -9,7 +9,7 @@ STATIC_ROOT = BASE_DIR / 'staticfiles'
 STATIC_URL = '/static/'
 
 STATICFILES_DIRS = [
-    BASE_DIR / 'frontend'
+    BASE_DIR / 'frontend' / 'build'
 ]
 
 SECRET_KEY = 'django-insecure-+q)k1jb(f!%$x=mal_%$j&lx(e0w6di_-x$di*u(2btw^k0ez3'

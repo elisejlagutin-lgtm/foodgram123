@@ -5,7 +5,7 @@ server {
     root /var/www/foodgram;
     index index.html;
 
-    location /home/ {
+    location /recipes/ {
         proxy_pass http://127.0.0.1:8000;
     }
 
