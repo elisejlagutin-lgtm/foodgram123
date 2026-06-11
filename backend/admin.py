@@ -5,8 +5,8 @@ from backend.models import Ingredients, Recipes, Tags
 
 @admin.register(Recipes)
 class RecipesAdmin(admin.ModelAdmin):
-    list_display = ('id', 'title', 'author', 'cooking_time', 'date_post')
-    list_filter = ('cooking_time', 'date_post')
+    list_display = ('id', 'name', 'author', 'cooking_time')
+    list_filter = ('cooking_time',)
     search_fields = ('description', 'author__username')
 
 

@@ -3,14 +3,23 @@ from datetime import timedelta
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-
-STATIC_ROOT = BASE_DIR / 'staticfiles'
-
 STATIC_URL = '/static/'
+
+# Папка, куда соберутся все статические файлы (результат collectstatic)
+STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 STATICFILES_DIRS = [
     BASE_DIR / 'frontend' / 'build'
 ]
+STATICFILES_FINDERS = [
+    'django.contrib.staticfiles.finders.FileSystemFinder',
+    'django.contrib.staticfiles.finders.AppDirectoriesFinder',
+]
+# URL для доступа к медиафайлам
+MEDIA_URL = '/media/'
+
+# Путь к папке для хранения загруженных файлов
+MEDIA_ROOT = BASE_DIR / 'media'
 
 SECRET_KEY = 'django-insecure-+q)k1jb(f!%$x=mal_%$j&lx(e0w6di_-x$di*u(2btw^k0ez3'
 
@@ -18,6 +27,10 @@ DEBUG = True
 AUTH_USER_MODEL = 'backend.CustomUser'
 ALLOWED_HOSTS = ["*"]
 
+AUTHENTICATION_BACKENDS = [
+    'api.backends.EmailBackend',
+    'django.contrib.auth.backends.ModelBackend',
+]
 
 
 INSTALLED_APPS = [
@@ -29,7 +42,9 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'backend.apps.BackendConfig',
     'rest_framework',
+    'rest_framework.authtoken',
     'djoser',
+    'django_filters',
     'api.apps.ApiConfig',
 ]
 
@@ -99,16 +114,18 @@ USE_TZ = True
 
 REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': [
-        'rest_framework.permissions.IsAuthenticated',
+        'rest_framework.permissions.AllowAny',
+    ],
+    'DEFAULT_FILTER_BACKENDS': [
+        'django_filters.rest_framework.DjangoFilterBackend',
+        # Можно добавить другие бэкенды
     ],
 
     'DEFAULT_AUTHENTICATION_CLASSES': [
-        'rest_framework_simplejwt.authentication.JWTAuthentication',
+        'rest_framework.authentication.TokenAuthentication',
     ],
-}
-SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(days=1),
-    'AUTH_HEADER_TYPES': ('Bearer',),
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.LimitOffsetPagination',
+    'PAGE_SIZE': 15,
 }
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'

@@ -2,6 +2,7 @@ from django.db import models
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AbstractUser
 from django.utils import timezone
+from rest_framework import serializers
 
 MAX_LEN_TITLE = 125
 MAX_LEN_DESCRIPTION = 625
@@ -11,32 +12,23 @@ class CustomUser(AbstractUser):
     """Кастомная модель пользователя"""
 
     is_subscribed = models.BooleanField(default=False)
-    avatar = models.ImageField(blank=True, null=True)
+    first_name = models.CharField(max_length=150)
+    last_name = models.CharField(max_length=150)
+    avatar = models.ImageField()
+    email = models.EmailField(
+        unique=True,
+        blank=False,
+        null=False
+    )
 
 
 User = get_user_model()
 
 
-class FavoriteRecipe(models.Model):
-    """Промежуточная модель для избранных рецептов"""
-
-    user = models.ForeignKey(
-        User,
-        on_delete=models.CASCADE,
-        verbose_name='Пользователь'
-    )
-    recipe = models.ForeignKey(
-        'Recipes',
-        on_delete=models.CASCADE,
-        verbose_name='Рецепт'
-    )
-    class Meta:
-        verbose_name_plural = 'Избранные рецепты'
-
 class Ingredients(models.Model):
     """Модель ингридиентов блюда."""
 
-    unit_measurement = models.TextField()
+    measurement_unit = models.TextField()
     name = models.TextField(
         max_length=MAX_LEN_TITLE
     )
@@ -48,7 +40,7 @@ class Ingredients(models.Model):
 class Tags(models.Model):
     """Модель тегов блюда."""
 
-    title = models.TextField(
+    name = models.TextField(
         max_length=MAX_LEN_TITLE
     )
     slug = models.SlugField()
@@ -60,24 +52,14 @@ class Tags(models.Model):
 class Recipes(models.Model):
     """Модель рептов."""
 
-    title = models.TextField(
+    name = models.TextField(
         max_length=MAX_LEN_TITLE,
         verbose_name='Название рецепта'
     )
-    is_publisched = models.BooleanField(
-        default=True,
-        verbose_name='Разрешение на публикацию'
-    )
-    date_post = models.DateTimeField(
-        default=timezone.now,
-        verbose_name='Дата публикации'
-    )
-    image = models.ImageField(
-        null=True,
-        blank=True,
-        verbose_name='Изображение рецепта'
-    )
-    description = models.TextField(
+    image = models.TextField()
+    is_favorited = models.BooleanField(default=False)
+    is_in_shopping_cart = models.BooleanField(default=False)
+    text = models.TextField(
         max_length=MAX_LEN_DESCRIPTION,
         verbose_name='Описание рецепта'
     )

@@ -1,24 +1,20 @@
 from django.urls import path, include
 from rest_framework.routers import SimpleRouter
-from rest_framework_simplejwt.views import (TokenObtainPairView,
-                                            TokenRefreshView,
-                                            TokenVerifyView)
-
 
 from . import views
 
-
-router = SimpleRouter()
-router.register(r'shopping_cart', views.ShopCartViewSet, basename='cart_shop')
-router.register(r'me', views.UserMeViewSet, basename='me')
-router.register(r'recipes', views.RecipeViewSet, basename='recipes')
-router.register(r'tags', views.TagViewSet, basename='tags')
-router.register(r'ingredients', views.IngredientViewSet, basename='ingredients')
-router.register(r'favorite', views.FavoriteRecipesViewSet, basename='favorite')
+other_router = SimpleRouter()
+other_router.register(r'users', views.CustomUserViewSet, basename='user')
+# other_router.register(r'subscription', )
+other_router.register(r'shopping_cart', views.ShopCartViewSet, basename='cart_shop')
+other_router.register(r'recipes', views.RecipeViewSet, basename='recipes')
+other_router.register(r'tags', views.TagViewSet, basename='tags')
+other_router.register(r'ingredients', views.IngredientViewSet, basename='ingredients')
 
 urlpatterns = [
-    path('token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
-    path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
-    path('token/verify/', TokenVerifyView.as_view(), name='token_verify'),
-    path('', include(router.urls)),
+    path('auth/token/login/', views.obtain_auth_token, name='token_obtain_pair'),
+    path('users/set_password/', views.change_password, name='change_password'),
+    path('users/me/avatar/', views.my_avatar, name='my_avatar'),
+    path('auth/token/logout/', views.logout_view, name='token_logout'),
+    path('', include(other_router.urls)),
 ]
