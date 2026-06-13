@@ -11,14 +11,26 @@ MAX_LEN_DESCRIPTION = 625
 class CustomUser(AbstractUser):
     """Кастомная модель пользователя"""
 
-    is_subscribed = models.BooleanField(default=False)
-    first_name = models.CharField(max_length=150)
-    last_name = models.CharField(max_length=150)
-    avatar = models.ImageField()
+    is_subscribed = models.BooleanField(
+        default=False,
+        verbose_name='Проверка подписки'
+    )
+    first_name = models.CharField(
+        max_length=150,
+        verbose_name='Имя'
+    )
+    last_name = models.CharField(
+        max_length=150,
+        verbose_name='Фамилия'
+    )
+    avatar = models.ImageField(
+        verbose_name='Аватар пользователя'
+    )
     email = models.EmailField(
         unique=True,
         blank=False,
-        null=False
+        null=False,
+        verbose_name='Почта пользователя'
     )
 
 
@@ -28,10 +40,14 @@ User = get_user_model()
 class Ingredients(models.Model):
     """Модель ингридиентов блюда."""
 
-    measurement_unit = models.TextField()
-    name = models.TextField(
-        max_length=MAX_LEN_TITLE
+    measurement_unit = models.TextField(
+        verbose_name='Единица измерения'
     )
+    name = models.TextField(
+        max_length=MAX_LEN_TITLE,
+        verbose_name='Название ингредиемна'
+    )
+    amount = models.IntegerField(null=True)
 
     class Meta:
         verbose_name_plural = 'Ингредиенты'
@@ -41,9 +57,12 @@ class Tags(models.Model):
     """Модель тегов блюда."""
 
     name = models.TextField(
-        max_length=MAX_LEN_TITLE
+        max_length=MAX_LEN_TITLE,
+        verbose_name='Название тега'
     )
-    slug = models.SlugField()
+    slug = models.SlugField(
+        verbose_name='Слаг тега'
+    )
 
     class Meta:
         verbose_name_plural = 'Теги'

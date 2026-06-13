@@ -2,14 +2,17 @@ from rest_framework import viewsets, permissions, status
 from backend.models import Recipes, Tags, Ingredients
 from rest_framework.decorators import api_view, permission_classes, action
 from rest_framework.response import Response
+from rest_framework.views import APIView
 from django_filters.rest_framework import DjangoFilterBackend
-from .filters import IngredientFilter
+from .filters import RecipesFilter
+from .permisions import IsAuthor
 import base64
 from django.core.files.base import ContentFile
 from rest_framework.authtoken.models import Token
 from .serializers import (RecipesSerializer,
                         CustomUserSerializer,
                         TagsSerializer,
+                        HomePageSerializer,
                         UserMeSerializer,
                         IngredientsSerializer,
                         EmailAuthTokenSerializer,
@@ -23,6 +26,8 @@ User = get_user_model()
 @api_view(['POST'])
 @permission_classes([permissions.IsAuthenticated])
 def change_password(request):
+    """Функция для изменения пароля"""
+
     user = request.user
     current_password = request.data.get('current_password')
     new_password = request.data.get('new_password')
@@ -46,9 +51,14 @@ def change_password(request):
 @api_view(['POST', 'PUT'])
 @permission_classes([permissions.IsAuthenticated])
 def my_avatar(request):
+    """Функция для работы с аватаром текущего пользователя"""
+
     data = request.data.get('avatar')
     if not data:
-        return Response({'error': 'Не переданы данные аватара'}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(
+            {'error': 'Не переданы данные аватара'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
 
     base64_data = data.split(',', 1)[1] if data.startswith('data:image') else data
 
@@ -72,6 +82,8 @@ def my_avatar(request):
 @api_view(['POST'])
 @permission_classes([permissions.AllowAny])
 def obtain_auth_token(request):
+    """Функция для получчения токена аутентификации"""
+
     serializer = EmailAuthTokenSerializer(data=request.data)
     serializer.is_valid(raise_exception=True)
     user = serializer.validated_data['user']
@@ -84,6 +96,8 @@ def obtain_auth_token(request):
 
 @api_view(['POST'])
 def logout_view(request):
+    """Функция для удаления токена аутентификации"""
+
     Token.objects.get(user=request.user).delete()
     return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -93,21 +107,26 @@ class RecipeViewSet(viewsets.ModelViewSet):
 
     queryset = Recipes.objects.all()
     serializer_class = RecipesSerializer
+    filter_backends = (DjangoFilterBackend,)
+    filterset_class = RecipesFilter
 
     def get_permissions(self):
-        if self.action in ['create', 'destroy', 'update']:
+        if self.action == 'create':
             return [permissions.IsAuthenticated()]
+        elif self.action in ['destroy', 'update']:
+            return [permissions.IsAuthenticated(), IsAuthor()]
         else:
             return [permissions.AllowAny()]
 
 
 class SubscriptionViewSet(viewsets.ModelViewSet):
+    """Вью сет для работы с подписками пользователей"""
 
-    serializer_class = ...
+    serializer_class = UserMeSerializer
     def get_queryset(self):
         return User.objects.filter(
-            id=self.request.user.id
-        ).select_related('su')
+            is_subscribed=True
+        )
 
 
 class CustomUserViewSet(UserViewSet):
@@ -118,6 +137,10 @@ class CustomUserViewSet(UserViewSet):
     def get_queryset(self):
         if 'me' in self.request.path:
             return User.objects.filter(id=self.request.user.id)
+        if 'subscriptions' in self.request.path:
+            return User.objects.filter(
+                is_subscribed=True
+            )
         return User.objects.all()
 
     def get_serializer_class(self):
@@ -128,14 +151,13 @@ class CustomUserViewSet(UserViewSet):
     def get_permissions(self):
         if self.action in ['destroy', 'update'] or 'me' in self.request.path:
             return [permissions.IsAuthenticated()]
-        else:
-            return [permissions.AllowAny()]
+        return [permissions.AllowAny()]
 
 
 class TagViewSet(viewsets.ModelViewSet):
     """Вью сет для работы с тегами"""
 
-    http_method_names = ('get', 'head', 'options',)
+    http_method_names = ('get', 'head', 'options', 'post',)
     queryset = Tags.objects.all()
     serializer_class = TagsSerializer
     permission_classes = [permissions.AllowAny]
@@ -144,11 +166,9 @@ class TagViewSet(viewsets.ModelViewSet):
 class IngredientViewSet(viewsets.ModelViewSet):
     """Вью сет для ингредиентов"""
 
-    http_method_names = ('get', 'head', 'options',)
+    http_method_names = ('get', 'head', 'options', 'post',)
     queryset = Ingredients.objects.all()
     serializer_class = IngredientsSerializer
-    filter_backends = [DjangoFilterBackend]
-    filterset_class = IngredientFilter
 
 
 class ShopCartViewSet(viewsets.ModelViewSet):
@@ -157,3 +177,14 @@ class ShopCartViewSet(viewsets.ModelViewSet):
     http_method_names = ('post', 'delete')
     queryset = Recipes.objects.all()
     serializer_class = ShopCardSerializer
+
+
+class HomeAPIView(APIView):
+    """Вьюсет для главной страницы"""
+
+    def list(self, request):
+        serializer = HomePageSerializer(
+            instance=None,
+            context={'request': request}
+        )
+        return Response(serializer.data)
