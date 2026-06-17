@@ -1,8 +1,6 @@
 from django.db import models
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AbstractUser
-from django.utils import timezone
-from rest_framework import serializers
 
 MAX_LEN_TITLE = 125
 MAX_LEN_DESCRIPTION = 625
@@ -11,10 +9,6 @@ MAX_LEN_DESCRIPTION = 625
 class CustomUser(AbstractUser):
     """Кастомная модель пользователя"""
 
-    is_subscribed = models.BooleanField(
-        default=False,
-        verbose_name='Проверка подписки'
-    )
     first_name = models.CharField(
         max_length=150,
         verbose_name='Имя'
@@ -24,7 +18,9 @@ class CustomUser(AbstractUser):
         verbose_name='Фамилия'
     )
     avatar = models.ImageField(
-        verbose_name='Аватар пользователя'
+        upload_to='users/', 
+        null=True,
+        default=None
     )
     email = models.EmailField(
         unique=True,
@@ -75,9 +71,9 @@ class Recipes(models.Model):
         max_length=MAX_LEN_TITLE,
         verbose_name='Название рецепта'
     )
-    image = models.TextField()
-    is_favorited = models.BooleanField(default=False)
-    is_in_shopping_cart = models.BooleanField(default=False)
+    image = models.ImageField(
+        upload_to='recipes/', 
+    )
     text = models.TextField(
         max_length=MAX_LEN_DESCRIPTION,
         verbose_name='Описание рецепта'
@@ -105,3 +101,34 @@ class Recipes(models.Model):
 
     class Meta:
         verbose_name_plural = 'Рецепты'
+
+
+class UserRecipesSettings(models.Model):
+    """Модель для личных полей пользователя"""
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    recipe = models.ForeignKey(Recipes, on_delete=models.CASCADE)
+    is_in_shopping_cart = models.BooleanField(default=False)
+    is_favorited = models.BooleanField(default=False)
+
+    class Meta:
+        unique_together = ('user', 'recipe')
+
+
+class UserSubscriptionsSettings(models.Model):
+    """Модель для личных полей подписчика"""
+
+    subscriber = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='subscriptions_as_subscriber'
+    )
+    creator = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='subscriptions_as_creator'
+    )
+    is_subscribed = models.BooleanField(default=False)
+
+    class Meta:
+        unique_together = ('subscriber', 'creator')

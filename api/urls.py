@@ -4,7 +4,6 @@ from rest_framework.routers import SimpleRouter
 from . import views
 
 other_router = SimpleRouter()
-other_router.register(r'subscription', views.SubscriptionViewSet, basename='sub')
 other_router.register(r'users', views.CustomUserViewSet, basename='user')
 other_router.register(r'shopping_cart', views.ShopCartViewSet, basename='cart_shop')
 other_router.register(r'recipes', views.RecipeViewSet, basename='recipes')

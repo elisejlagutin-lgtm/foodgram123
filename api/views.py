@@ -1,11 +1,16 @@
 from rest_framework import viewsets, permissions, status
-from backend.models import Recipes, Tags, Ingredients
+from backend.models import (Recipes,
+                            Tags,
+                            Ingredients,
+                            UserRecipesSettings,
+                            UserSubscriptionsSettings)
 from rest_framework.decorators import api_view, permission_classes, action
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from django_filters.rest_framework import DjangoFilterBackend
 from .filters import RecipesFilter
 from .permisions import IsAuthor
+from django.shortcuts import get_object_or_404
 import base64
 from django.core.files.base import ContentFile
 from rest_framework.authtoken.models import Token
@@ -70,7 +75,7 @@ def my_avatar(request):
             save=True
         )
         return Response({
-            'avatar_url': user.avatar.url
+            'avatar': user.avatar.url
         }, status=status.HTTP_200_OK)
     except Exception:
         return Response(
@@ -118,15 +123,116 @@ class RecipeViewSet(viewsets.ModelViewSet):
         else:
             return [permissions.AllowAny()]
 
+    def _check_status(self, user, recipe, field_name, yes_or_not):
+        existing = UserRecipesSettings.objects.filter(
+            user=user,
+            recipe=recipe,
+            field_name=yes_or_not
+        ).exists()
+        if existing:
+            return Response(
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
-class SubscriptionViewSet(viewsets.ModelViewSet):
-    """Вью сет для работы с подписками пользователей"""
+    def  _get_user_recipe_setting(self, user, recipe):
+        return UserRecipesSettings.objects.get_or_create(
+                user=user,
+                recipe=recipe
+            )
 
-    serializer_class = UserMeSerializer
-    def get_queryset(self):
-        return User.objects.filter(
-            is_subscribed=True
+    @action(detail=True, methods=['post', 'delete'], url_path='favorite')
+    def is_favorited(self, request, pk):
+        user = request.user
+        if not user.is_authenticated:
+            return Response(
+            status=status.HTTP_401_UNAUTHORIZED
         )
+        recipe = get_object_or_404(Recipes, pk=pk)
+        if request.method == 'POST':
+            setting, created = UserRecipesSettings.objects.get_or_create(
+                user=user,
+                recipe=recipe
+            )
+            self._check_status(
+                user=user,
+                recipe=recipe,
+                field_name='is_favorited',
+                yes_or_not=True
+            )
+            setting.is_favorited = True
+            setting.save()
+            return Response(
+                {
+                    'id': recipe.id,
+                    'name': recipe.name,
+                    'image': recipe.image,
+                    'cooking_time': recipe.cooking_time
+                },
+                status=status.HTTP_201_CREATED)
+
+        if request.method == 'DELETE':
+            setting, created = UserRecipesSettings.objects.get_or_create(
+                user=user,
+                recipe=recipe
+            )
+            self._check_status(
+                user=user,
+                recipe=recipe,
+                field_name='is_favorited',
+                yes_or_not=False
+            )
+            setting.is_favorited = False
+            setting.save()
+            return Response(
+                status=status.HTTP_204_NO_CONTENT
+            )
+
+    @action(detail=True, methods=['post', 'delete'], url_path='shopping_cart')
+    def shopping_cart(self, request, pk):
+        user = request.user
+        if not user.is_authenticated:
+            return Response(
+            status=status.HTTP_401_UNAUTHORIZED
+        )
+        recipe = get_object_or_404(Recipes, pk=pk)
+        if request.method == 'POST':
+            setting, created = UserRecipesSettings.objects.get_or_create(
+                user=user,
+                recipe=recipe
+            )
+            self._check_status(
+                user=user,
+                recipe=recipe,
+                field_name='is_in_shopping_cart',
+                yes_or_not=True
+            )
+            setting.is_in_shopping_cart = True
+            setting.save()
+            return Response(
+                {
+                    'id': recipe.id,
+                    'name': recipe.name,
+                    'image': recipe.image,
+                    'cooking_time': recipe.cooking_time
+                },
+                status=status.HTTP_201_CREATED
+            )
+        if request.method == 'DELETE':
+            setting, created = UserRecipesSettings.objects.get_or_create(
+                user=user,
+                recipe=recipe
+            )
+            self._check_status(
+                user=user,
+                recipe=recipe,
+                field_name='is_in_shopping_cart',
+                yes_or_not=False
+            )
+            setting.is_in_shopping_cart = False
+            setting.save()
+            return Response(
+                status=status.HTTP_204_NO_CONTENT
+            )
 
 
 class CustomUserViewSet(UserViewSet):
@@ -137,10 +243,6 @@ class CustomUserViewSet(UserViewSet):
     def get_queryset(self):
         if 'me' in self.request.path:
             return User.objects.filter(id=self.request.user.id)
-        if 'subscriptions' in self.request.path:
-            return User.objects.filter(
-                is_subscribed=True
-            )
         return User.objects.all()
 
     def get_serializer_class(self):
@@ -153,11 +255,72 @@ class CustomUserViewSet(UserViewSet):
             return [permissions.IsAuthenticated()]
         return [permissions.AllowAny()]
 
+    @action(detail=False, methods=['get'], url_path='subscriptions')
+    def my_subscriptions(self, request):
+
+        user = request.user
+        if not user.is_authenticated:
+            return Response(
+            status=status.HTTP_401_UNAUTHORIZED
+        )
+        subscriptions_id = UserSubscriptionsSettings.objects.filter(
+            subscriber=user,
+            is_subscribed=True
+        ).values_list('creator_id', flat=True)
+        subscribed_users = User.objects.filter(id__in=subscriptions_id)
+        serializer = UserMeSerializer(subscribed_users, many=True, context={'request': request})
+        return Response(
+            serializer.data
+        )
+
+    @action(detail=True, methods=['post', 'delete'], url_path='subscribe')
+    def subscriptions(self, request, id=None):
+        user = self.request.user
+        if not user.is_authenticated:
+            return Response(
+            status=status.HTTP_401_UNAUTHORIZED
+        )
+        creator = get_object_or_404(User, pk=id)
+        if user == creator:
+            return Response(status=status.HTTP_400_BAD_REQUEST)
+        setting, created = UserSubscriptionsSettings.objects.get_or_create(
+            subscriber=user,
+            creator=creator
+        )
+        if request.method == 'POST':
+            creator_recipes = Recipes.objects.filter(
+                author=creator
+            )
+            serializer = RecipesSerializer(creator_recipes, many=True, context={'request': request})
+            setting.is_subscribed = True
+            setting.save()
+            return Response(
+                {
+                    "email": creator.email,
+                    "id": creator.id,
+                    "username": creator.username,
+                    "first_name": creator.first_name,
+                    "last_name": creator.last_name,
+                    "is_subscribed": setting.is_subscribed,
+                    "recipes": serializer.data,
+                    "avatar": creator.avatar,
+                    "recipes_count": len(serializer.data)
+                },
+                status=status.HTTP_201_CREATED
+            )
+
+        if request.method == 'DELETE':
+            if not setting.is_subscribed:
+                return Response(status=status.HTTP_400_BAD_REQUEST)
+            setting.is_subscribed = False
+            setting.save()
+            return Response(status=status.HTTP_204_NO_CONTENT)
+
 
 class TagViewSet(viewsets.ModelViewSet):
     """Вью сет для работы с тегами"""
 
-    http_method_names = ('get', 'head', 'options', 'post',)
+    http_method_names = ('get', 'head', 'options',)
     queryset = Tags.objects.all()
     serializer_class = TagsSerializer
     permission_classes = [permissions.AllowAny]
@@ -166,7 +329,7 @@ class TagViewSet(viewsets.ModelViewSet):
 class IngredientViewSet(viewsets.ModelViewSet):
     """Вью сет для ингредиентов"""
 
-    http_method_names = ('get', 'head', 'options', 'post',)
+    http_method_names = ('get', 'head', 'options',)
     queryset = Ingredients.objects.all()
     serializer_class = IngredientsSerializer
 

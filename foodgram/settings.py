@@ -15,10 +15,7 @@ STATICFILES_FINDERS = [
     'django.contrib.staticfiles.finders.FileSystemFinder',
     'django.contrib.staticfiles.finders.AppDirectoriesFinder',
 ]
-# URL для доступа к медиафайлам
 MEDIA_URL = '/media/'
-
-# Путь к папке для хранения загруженных файлов
 MEDIA_ROOT = BASE_DIR / 'media'
 
 SECRET_KEY = 'django-insecure-+q)k1jb(f!%$x=mal_%$j&lx(e0w6di_-x$di*u(2btw^k0ez3'

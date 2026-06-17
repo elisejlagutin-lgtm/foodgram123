@@ -3,12 +3,17 @@ from djoser.serializers import UserSerializer
 import base64
 from django.core.files.base import ContentFile
 
-from backend.models import Recipes, Tags, Ingredients, CustomUser
+from backend.models import Recipes, Tags, Ingredients, CustomUser, UserRecipesSettings, UserSubscriptionsSettings
 from django.contrib.auth import get_user_model
 from django.contrib.auth import authenticate
 from django.shortcuts import get_object_or_404
 from django.utils.translation import gettext_lazy as _
 
+
+import base64
+import uuid
+from django.core.files.base import ContentFile
+from rest_framework import serializers
 from django.http import Http404
 User = get_user_model()
 
@@ -69,14 +74,66 @@ class EmailAuthTokenSerializer(serializers.Serializer):
         return attrs
 
 
+class Base64ImageField(serializers.ImageField):
+    def to_internal_value(self, data):
+        # Если полученный объект строка, и эта строка 
+        # начинается с 'data:image'...
+        if isinstance(data, str) and data.startswith('data:image'):
+            # ...начинаем декодировать изображение из base64.
+            # Сначала нужно разделить строку на части.
+            format, imgstr = data.split(';base64,')  
+            # И извлечь расширение файла.
+            ext = format.split('/')[-1]  
+            # Затем декодировать сами данные и поместить результат в файл,
+            # которому дать название по шаблону.
+            data = ContentFile(base64.b64decode(imgstr), name='temp.' + ext)
+
+        return super().to_internal_value(data)
+
+
+class UserMeSerializer(UserSerializer):
+    """Сериализатор для модели пользователей"""
+
+    password = serializers.CharField(write_only=True)
+    is_subscribed = serializers.SerializerMethodField()
+    avatar = Base64ImageField(required=False, allow_null=True)
+
+    class Meta:
+        model = CustomUser
+        fields = (
+            'email',
+            "username",
+            "password",
+            'id',
+            'first_name',
+            'last_name',
+            'is_subscribed',
+            'avatar',
+        )
+
+    def get_is_subscribed(self, obj):
+        user = self.context['request'].user
+        if user.is_authenticated:
+            return UserSubscriptionsSettings.objects.filter(
+                subscriber=user,
+                creator=obj,
+                is_subscribed=True
+            ).exists()
+
+
+class RecipeIngredientSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    amount = serializers.IntegerField(min_value=1)
+
+
 class RecipesSerializer(serializers.ModelSerializer):
     """Сериализатор для модели рецептов"""
 
-    ingredients = IngredientsSerializer(many=True)
-    author = serializers.SlugRelatedField(
-        slug_field='username',
-        read_only=True
-    )
+    ingredients = RecipeIngredientSerializer(many=True)
+    author = UserMeSerializer(read_only=True)
+    image = Base64ImageField(required=True, allow_null=False)
+    is_favorited = serializers.SerializerMethodField()
+    is_in_shopping_cart = serializers.SerializerMethodField()
 
     class Meta:
         model = Recipes
@@ -91,14 +148,25 @@ class RecipesSerializer(serializers.ModelSerializer):
                 'text',
                 'author')
 
-    def validate_image(self, value):
-        if isinstance(value, str) and value.startswith('data:image'):
-            format, imgstr = value.split(';base64,')
-            ext = format.split('/')[-1]
-            data = base64.b64decode(imgstr)
-            file_name = f'recipe_image.{ext}'
-            return ContentFile(data, name=file_name)
-        return value
+    # Напиши сам функцию которая декодирует base64 в файл
+
+    def get_is_favorited(self, obj):
+        user = self.context['request'].user
+        if user.is_authenticated:
+            return UserRecipesSettings.objects.filter(
+                user=user,
+                recipe=obj,
+                is_favorited=True
+            ).exists()
+
+    def get_is_in_shopping_cart(self, obj):
+        user = self.context['request'].user
+        if user.is_authenticated:
+            return UserRecipesSettings.objects.filter(
+                user=user,
+                recipe=obj,
+                is_in_shopping_cart=True
+            ).exists()
 
     def create(self, validated_data):
         ingredients_data = validated_data.pop('ingredients')
@@ -149,6 +217,7 @@ class RecipesSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError()
         return data
 
+
 class ShopCardSerializer(serializers.ModelSerializer):
     """Сериализатор для покупок"""
 
@@ -163,8 +232,8 @@ class ShopCardSerializer(serializers.ModelSerializer):
 
 
 class CustomUserSerializer(UserSerializer):
-    is_subscribed = serializers.HiddenField(default=False)
-    avatar = serializers.ImageField(write_only=True, required=False)
+    is_subscribed = serializers.SerializerMethodField()
+    avatar = Base64ImageField(required=False, allow_null=True)
     password = serializers.CharField(write_only=True)
 
     class Meta(UserSerializer.Meta):
@@ -181,6 +250,15 @@ class CustomUserSerializer(UserSerializer):
         )
         read_only_fields = ()
 
+    def get_is_subscribed(self, obj):
+        user = self.context['request'].user
+        if user.is_authenticated:
+            return UserSubscriptionsSettings.objects.filter(
+                subscriber=user,
+                creator=obj,
+                is_subscribed=True
+            ).exists()
+
     def create(self, validated_data):
         password = validated_data.pop('password')
         user = super().create(validated_data)
@@ -192,6 +270,7 @@ class CustomUserSerializer(UserSerializer):
 class UserMeSerializer(UserSerializer):
     """Сериализатор для модели пользователей"""
 
+    is_subscribed = serializers.SerializerMethodField()
     password = serializers.CharField(write_only=True)
 
     class Meta:
@@ -206,6 +285,14 @@ class UserMeSerializer(UserSerializer):
             'is_subscribed',
             'avatar',
         )
+
+    def get_is_subscribed(self, obj):
+        request = self.context.get('request')
+        if request.user.is_authenticated:
+            return UserSubscriptionsSettings.objects.filter(
+                subscriber=request.user,
+                is_subscribed=True
+            ).exists()
 
 
 class HomePageSerializer(serializers.Serializer):
