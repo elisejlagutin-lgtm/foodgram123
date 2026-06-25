@@ -1,12 +1,10 @@
 from pathlib import Path
-from datetime import timedelta
+import os
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 STATIC_URL = '/static/'
-
-# Папка, куда соберутся все статические файлы (результат collectstatic)
-STATIC_ROOT = BASE_DIR / 'staticfiles'
+STATIC_ROOT = '/app/static'
 
 STATICFILES_DIRS = [
     BASE_DIR / 'frontend' / 'build'
@@ -21,7 +19,7 @@ MEDIA_ROOT = BASE_DIR / 'media'
 SECRET_KEY = 'django-insecure-+q)k1jb(f!%$x=mal_%$j&lx(e0w6di_-x$di*u(2btw^k0ez3'
 
 DEBUG = True
-AUTH_USER_MODEL = 'backend.CustomUser'
+AUTH_USER_MODEL = 'api.CustomUser'
 ALLOWED_HOSTS = ["*"]
 
 AUTHENTICATION_BACKENDS = [
@@ -37,7 +35,6 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'backend.apps.BackendConfig',
     'rest_framework',
     'rest_framework.authtoken',
     'djoser',
@@ -79,8 +76,12 @@ WSGI_APPLICATION = 'foodgram.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': os.getenv('POSTGRES_DB', 'foodgram'),
+        'USER': os.getenv('POSTGRES_USER', 'foodgram_user'),
+        'PASSWORD': os.getenv('POSTGRES_PASSWORD', 'foodgram_password'),
+        'HOST': 'db',  # имя сервиса в docker-compose.yml
+        'PORT': '5432',
     }
 }
 

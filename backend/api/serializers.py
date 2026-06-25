@@ -1,20 +1,22 @@
+import base64
+
 from rest_framework import serializers
 from djoser.serializers import UserSerializer
-import base64
 from django.core.files.base import ContentFile
-
-from backend.models import Recipes, Tags, Ingredients, CustomUser, UserRecipesSettings, UserSubscriptionsSettings
+from django.utils import timezone
 from django.contrib.auth import get_user_model
 from django.contrib.auth import authenticate
 from django.shortcuts import get_object_or_404
 from django.utils.translation import gettext_lazy as _
-
-
-import base64
-import uuid
-from django.core.files.base import ContentFile
-from rest_framework import serializers
 from django.http import Http404
+
+from .models import (Recipes,
+                            Tags,
+                            Ingredients,
+                            CustomUser,
+                            UserRecipesSettings,
+                            UserSubscriptionsSettings)
+
 User = get_user_model()
 
 
@@ -113,6 +115,10 @@ class UserMeSerializer(UserSerializer):
 
     def get_is_subscribed(self, obj):
         user = self.context['request'].user
+
+        if not user or not user.is_authenticated:
+            return False
+
         if user.is_authenticated:
             return UserSubscriptionsSettings.objects.filter(
                 subscriber=user,
@@ -123,14 +129,40 @@ class UserMeSerializer(UserSerializer):
 
 class RecipeIngredientSerializer(serializers.Serializer):
     id = serializers.IntegerField()
+    name = serializers.CharField(required=False)
+    measurement_unit = serializers.CharField(required=False)
     amount = serializers.IntegerField(min_value=1)
 
+
+class ReducedRecipeSerializer(serializers.ModelSerializer):
+    """Сериализатор для модели рецептов"""
+
+    class Meta:
+        model = Recipes
+        fields = (
+            'id',
+            'name',
+            'image',
+            'cooking_time',
+        )
 
 class RecipesSerializer(serializers.ModelSerializer):
     """Сериализатор для модели рецептов"""
 
     ingredients = RecipeIngredientSerializer(many=True)
+    ingredient_ids = serializers.PrimaryKeyRelatedField(
+        source='ingredients',
+        queryset=Ingredients.objects.all(),
+        required=False,
+        many=True,
+        write_only=True
+    )
     author = UserMeSerializer(read_only=True)
+    tags = serializers.PrimaryKeyRelatedField(
+        queryset=Tags.objects.all(),
+        many=True,
+        required=True
+    )
     image = Base64ImageField(required=True, allow_null=False)
     is_favorited = serializers.SerializerMethodField()
     is_in_shopping_cart = serializers.SerializerMethodField()
@@ -141,6 +173,7 @@ class RecipesSerializer(serializers.ModelSerializer):
                 'name',
                 'tags',
                 'is_favorited',
+                'ingredient_ids',
                 'is_in_shopping_cart',
                 'image',
                 'cooking_time',
@@ -148,10 +181,22 @@ class RecipesSerializer(serializers.ModelSerializer):
                 'text',
                 'author')
 
-    # Напиши сам функцию которая декодирует base64 в файл
+    def update(self, instance, validated_data):
+        instance.name = validated_data.get('name', instance.name)
+        instance.text = validated_data.get('text', instance.text)
+        instance.save()
+        ingredient_ids = [item['id'] for item in validated_data.get('ingredients', [])]
+        tag_ids = validated_data.get('tags', [])
+        instance.ingredients.set(ingredient_ids)
+        instance.tags.set(tag_ids)
+        return instance
 
     def get_is_favorited(self, obj):
         user = self.context['request'].user
+
+        if not user or not user.is_authenticated:
+            return False
+        
         if user.is_authenticated:
             return UserRecipesSettings.objects.filter(
                 user=user,
@@ -161,6 +206,9 @@ class RecipesSerializer(serializers.ModelSerializer):
 
     def get_is_in_shopping_cart(self, obj):
         user = self.context['request'].user
+
+        if not user or not user.is_authenticated:
+            return False
         if user.is_authenticated:
             return UserRecipesSettings.objects.filter(
                 user=user,
@@ -172,6 +220,7 @@ class RecipesSerializer(serializers.ModelSerializer):
         ingredients_data = validated_data.pop('ingredients')
         tags_data = validated_data.pop('tags')
         validated_data['author'] = self.context['request'].user
+        validated_data['date_post'] = timezone.now()
         recipe = super().create(validated_data)
         for tag_id in tags_data:
             recipe.tags.add(tag_id)
@@ -186,7 +235,7 @@ class RecipesSerializer(serializers.ModelSerializer):
         return value
 
     def validate_tags(self, value):
-        if value is None:
+        if value is None or value == []:
             raise serializers.ValidationError('Список тегов не может быть пустым')
         seen = set()
         for tag in value:
@@ -208,6 +257,13 @@ class RecipesSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError()
             seen.add(ingredient['id'])
         return value
+
+    def to_representation(self, instance):
+        representation = super().to_representation(instance)
+        tags_data = representation.pop('tags')
+        tags_qs = Tags.objects.filter(id__in=tags_data)
+        representation['tags'] = TagsSerializer(tags_qs, many=True).data
+        return representation
 
     def validate(self, data):
         ingredients = data.get('ingredients')
@@ -232,8 +288,6 @@ class ShopCardSerializer(serializers.ModelSerializer):
 
 
 class CustomUserSerializer(UserSerializer):
-    is_subscribed = serializers.SerializerMethodField()
-    avatar = Base64ImageField(required=False, allow_null=True)
     password = serializers.CharField(write_only=True)
 
     class Meta(UserSerializer.Meta):
@@ -245,19 +299,8 @@ class CustomUserSerializer(UserSerializer):
             "first_name",
             "password",
             "last_name",
-            'is_subscribed',
-            'avatar',
         )
         read_only_fields = ()
-
-    def get_is_subscribed(self, obj):
-        user = self.context['request'].user
-        if user.is_authenticated:
-            return UserSubscriptionsSettings.objects.filter(
-                subscriber=user,
-                creator=obj,
-                is_subscribed=True
-            ).exists()
 
     def create(self, validated_data):
         password = validated_data.pop('password')
@@ -271,6 +314,7 @@ class UserMeSerializer(UserSerializer):
     """Сериализатор для модели пользователей"""
 
     is_subscribed = serializers.SerializerMethodField()
+    avatar = Base64ImageField(required=False, allow_null=True)
     password = serializers.CharField(write_only=True)
 
     class Meta:
@@ -288,9 +332,12 @@ class UserMeSerializer(UserSerializer):
 
     def get_is_subscribed(self, obj):
         request = self.context.get('request')
+        if not request or not request.user.is_authenticated:
+            return False
         if request.user.is_authenticated:
             return UserSubscriptionsSettings.objects.filter(
                 subscriber=request.user,
+                creator=obj,
                 is_subscribed=True
             ).exists()
 
@@ -298,6 +345,9 @@ class UserMeSerializer(UserSerializer):
 class HomePageSerializer(serializers.Serializer):
     recipes = serializers.SerializerMethodField()
 
-    def get_last_recipes(self, obj):
-        recipes = Recipes.objects.order_by('-data_post')[:6]
-        return RecipesSerializer(recipes, many=True).data
+    def get_recipes(self, obj):
+        # Фильтрация: только featured товары, отсортированные по цене
+        recipes_last = Recipes.objects.filter(
+        ).order_by('price')[:5]  # берём первые 5
+        serializer = RecipesSerializer(recipes_last, many=True)
+        return serializer.data

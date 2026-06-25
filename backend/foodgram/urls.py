@@ -8,7 +8,7 @@ urlpatterns = [
     path('auth/', include('django.contrib.auth.urls')),
     path('auth/', include('djoser.urls.jwt')),
     path('api/', include('api.urls')),
-    path('', include('backend.urls'))
+    path('', include('api.urls_backend'))
 ]
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

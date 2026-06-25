@@ -64,6 +64,19 @@ class Tags(models.Model):
         verbose_name_plural = 'Теги'
 
 
+class ShortLink(models.Model):
+    """Модель для получения короткой ссылки на рецепт"""
+
+    recipe = models.ForeignKey(
+        'Recipes',
+        on_delete=models.CASCADE
+    )
+    code = models.CharField()
+
+    class Meta:
+        unique_together = ('code', 'recipe')
+
+
 class Recipes(models.Model):
     """Модель рептов."""
 
@@ -71,6 +84,8 @@ class Recipes(models.Model):
         max_length=MAX_LEN_TITLE,
         verbose_name='Название рецепта'
     )
+    date_post = models.DateTimeField()
+    is_published = models.BooleanField(default=True)
     image = models.ImageField(
         upload_to='recipes/', 
     )

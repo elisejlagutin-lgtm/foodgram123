@@ -7,7 +7,7 @@ RUN pip install gunicorn==25.3.0
 COPY requirements.txt .
 
 RUN pip install -r requirements.txt --no-cache-dir
-
 COPY . .
+RUN python manage.py collectstatic
 
-CMD ["gunicorn", "--bind", "0.0.0.0:8000", "backend.wsgi"]
+CMD ["gunicorn", "--bind", "0.0.0.0:7000", "foodgram.wsgi:application"]
