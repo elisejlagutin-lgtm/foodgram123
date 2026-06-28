@@ -380,7 +380,7 @@ class CustomUserViewSet(UserViewSet):
 class TagViewSet(viewsets.ModelViewSet):
     """Вью сет для работы с тегами"""
 
-    http_method_names = ('get', 'head', 'options',)
+    http_method_names = ('get', 'head', 'options', 'post',)
     queryset = Tags.objects.all()
     serializer_class = TagsSerializer
     pagination_class = None
@@ -392,7 +392,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 class IngredientViewSet(viewsets.ModelViewSet):
     """Вью сет для ингредиентов"""
 
-    http_method_names = ('get', 'head', 'options',)
+    http_method_names = ('get', 'head', 'options', 'post',)
     pagination_class = None
     queryset = Ingredients.objects.all()
     serializer_class = IngredientsSerializer
