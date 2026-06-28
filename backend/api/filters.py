@@ -15,7 +15,7 @@ class RecipesFilter(rest_framework.FilterSet):
         queryset=Tags.objects.all(),
         to_field_name='slug'
     )
-    is_in_shopping_cart = rest_framework.ModelChoiceFilter(
+    is_in_shopping_cart = rest_framework.BooleanFilter(
         method='filter_is_in_shopping_cart'
     )
     is_favorited = rest_framework.BooleanFilter(
