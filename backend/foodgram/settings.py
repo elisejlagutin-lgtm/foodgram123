@@ -4,7 +4,7 @@ import os
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 STATIC_URL = '/static/'
-STATIC_ROOT = '/app/static'
+STATIC_ROOT = '/app/static/static/'
 
 STATICFILES_DIRS = [
     BASE_DIR / 'frontend' / 'build'

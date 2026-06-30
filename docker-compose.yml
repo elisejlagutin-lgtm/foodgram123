@@ -14,13 +14,12 @@ services:
     build: ./backend/
     env_file: .env
     volumes:
-      - static:/static
+      - static:/app/static
 
   frontend:
     build: ./frontend/
-    command: sh -c "cp -r /app/build/. /app/static"
     volumes:
-      - static:/app/static
+      - static:/app/build
 
   gateway:
     build: ./nginx/
